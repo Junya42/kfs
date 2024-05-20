@@ -40,17 +40,17 @@ all: $(BOOT_IMG)
 # Create a bootable image
 $(BOOT_IMG): $(KERNEL_BIN) grub_install
 	$(DD) if=/dev/zero of=$(BOOT_IMG) bs=1M count=10
-	sudo $(LOSETUP) /dev/loop0 $(BOOT_IMG)
-	sudo $(PARTED) /dev/loop0 --script mklabel msdos
-	sudo $(PARTED) /dev/loop0 --script mkpart primary ext2 1MiB 100%
-	sudo $(MKFS) /dev/loop0p1
-	sudo $(MOUNT) /dev/loop0p1 $(MOUNT_POINT)
+	LOOP_DEVICE=$(shell sudo losetup -f --show $(BOOT_IMG))
+	sudo $(PARTED) $(LOOP_DEVICE) --script mklabel msdos
+	sudo $(PARTED) $(LOOP_DEVICE) --script mkpart primary ext2 1MiB 100%
+	sudo $(MKFS) -t ext2 $(LOOP_DEVICE)p1
+	sudo $(MOUNT) $(LOOP_DEVICE)p1 $(MOUNT_POINT)
 	sudo mkdir -p $(MOUNT_POINT)/boot/grub
 	sudo cp $(KERNEL_BIN) $(MOUNT_POINT)/boot/
 	sudo cp $(GRUB_CFG) $(MOUNT_POINT)/boot/grub/
-	sudo $(GRUB_INSTALL) --root-directory=$(MOUNT_POINT) --no-floppy --modules="normal part_msdos ext2 multiboot" /dev/loop0
+	sudo $(GRUB_INSTALL) --root-directory=$(MOUNT_POINT) --no-floppy --modules="normal part_msdos ext2 multiboot" $(LOOP_DEVICE)
 	sudo $(UMOUNT) $(MOUNT_POINT)
-	sudo $(LOSETUP) -d /dev/loop0
+	sudo losetup -d $(LOOP_DEVICE)
 
 # Compile the kernel
 $(KERNEL_BIN): $(ASM_OBJECTS) $(C_OBJECTS)
