@@ -38,8 +38,7 @@ C_OBJECTS = $(C_SOURCES:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 all: $(BOOT_IMG)
 
 # Create a bootable image
-$(BOOT_IMG): $(KERNEL_BIN) $(GRUB_CFG)
-	$(DD) if=/dev/zero of=$(BOOT_IMG) bs=1M count=10
+$(BOOT_IMG): $(KERNEL_BIN) $(GRUB_CFG) kernel_img_setup
 	LOOP_DEVICE=$(shell sudo losetup -f --show $(BOOT_IMG))
 	sudo $(PARTED) $$LOOP_DEVICE --script mklabel msdos
 	sudo $(PARTED) $$LOOP_DEVICE --script mkpart primary ext2 1MiB 100%
@@ -51,6 +50,10 @@ $(BOOT_IMG): $(KERNEL_BIN) $(GRUB_CFG)
 	sudo $(GRUB_INSTALL) --root-directory=$(MOUNT_POINT) --no-floppy --modules="normal part_msdos ext2 multiboot" $$LOOP_DEVICE
 	sudo $(UMOUNT) $(MOUNT_POINT)
 	sudo losetup -d $$LOOP_DEVICE
+
+# Create the kernel image file
+kernel_img_setup:
+	$(DD) if=/dev/zero of=$(BOOT_IMG) bs=1M count=10
 
 # Compile the kernel
 $(KERNEL_BIN): $(ASM_OBJECTS) $(C_OBJECTS)
