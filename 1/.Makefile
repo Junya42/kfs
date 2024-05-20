@@ -38,19 +38,22 @@ C_OBJECTS = $(C_SOURCES:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 all: $(BOOT_IMG)
 
 # Create a bootable image
-$(BOOT_IMG): $(KERNEL_BIN) $(GRUB_CFG)
-	$(DD) if=/dev/zero of=$(BOOT_IMG) bs=1M count=10
+$(BOOT_IMG): $(KERNEL_BIN) grub_install kernel.img
 	LOOP_DEVICE=$(shell sudo losetup -f --show $(BOOT_IMG))
-	sudo $(PARTED) $$LOOP_DEVICE --script mklabel msdos
-	sudo $(PARTED) $$LOOP_DEVICE --script mkpart primary ext2 1MiB 100%
-	sudo $(MKFS) -t ext2 $$LOOP_DEVICE"p1"
-	sudo $(MOUNT) $$LOOP_DEVICE"p1" $(MOUNT_POINT)
+	sudo $(PARTED) $(LOOP_DEVICE) --script mklabel msdos
+	sudo $(PARTED) $(LOOP_DEVICE) --script mkpart primary ext2 1MiB 100%
+	sudo $(MKFS) -t ext2 $${LOOP_DEVICE}p1
+	sudo $(MOUNT) $${LOOP_DEVICE}p1 $(MOUNT_POINT)
 	sudo mkdir -p $(MOUNT_POINT)/boot/grub
 	sudo cp $(KERNEL_BIN) $(MOUNT_POINT)/boot/
 	sudo cp $(GRUB_CFG) $(MOUNT_POINT)/boot/grub/
-	sudo $(GRUB_INSTALL) --root-directory=$(MOUNT_POINT) --no-floppy --modules="normal part_msdos ext2 multiboot" $$LOOP_DEVICE
+	sudo $(GRUB_INSTALL) --root-directory=$(MOUNT_POINT) --no-floppy --modules="normal part_msdos ext2 multiboot" $${LOOP_DEVICE}
 	sudo $(UMOUNT) $(MOUNT_POINT)
-	sudo losetup -d $$LOOP_DEVICE
+	sudo losetup -d $${LOOP_DEVICE}
+
+# Create the kernel image file
+kernel.img:
+	$(DD) if=/dev/zero of=$(BOOT_IMG) bs=1M count=10
 
 # Compile the kernel
 $(KERNEL_BIN): $(ASM_OBJECTS) $(C_OBJECTS)
@@ -69,15 +72,8 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-# Create the GRUB configuration
-$(GRUB_CFG):
-	echo 'set timeout=5' > $(GRUB_CFG)
-	echo 'set default=0' >> $(GRUB_CFG)
-	echo '' >> $(GRUB_CFG)
-	echo 'menuentry "My Kernel" {' >> $(GRUB_CFG)
-	echo '    multiboot /boot/kernel.bin' >> $(GRUB_CFG)
-	echo '    boot' >> $(GRUB_CFG)
-	echo '}' >> $(GRUB_CFG)
+# GRUB configuration
+grub_install: $(GRUB_CFG)
 
 # Clean build artifacts
 clean:
@@ -88,4 +84,4 @@ clean:
 run: $(BOOT_IMG)
 	$(QEMU) -drive file=$(BOOT_IMG),format=raw
 
-.PHONY: all clean run
+.PHONY: all clean run grub_install
